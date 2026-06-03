@@ -7,9 +7,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        .container { max-width: 900px; margin: 40px auto; }
+        .container { max-width: 1000px; margin: 40px auto; }
         .card { padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .btn { padding: 12px 20px; font-size: 16px; }
+        .btn { padding: 8px 12px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -31,10 +31,24 @@
         <button class="btn btn-secondary mt-2 w-100" onclick="backToWelcome()">返回</button>
     </div>
 
-    <!-- 教练主页（只有2个按钮） -->
+    <!-- 教练主页 -->
     <div id="page-coach-main" class="card d-none text-center">
-        <h4 id="my-info" class="mb-4"></h4>
-        <button class="btn btn-success w-100 mb-3" onclick="confirmInfo()">确认</button>
+        <h4 id="coach-title" class="mb-3"></h4>
+        
+        <!-- 已确认表格 -->
+        <div id="final-table" class="mb-4">
+            <table class="table table-bordered text-center">
+                <tr><th>教练姓名</th><th>上课课时</th><th>结算金额</th><th>确认状态</th></tr>
+                <tr>
+                    <td id="c-name"></td>
+                    <td id="c-lesson"></td>
+                    <td id="c-money"></td>
+                    <td id="c-status"></td>
+                </tr>
+            </table>
+        </div>
+
+        <button id="btn-confirm" class="btn btn-success w-100 mb-3" onclick="confirmInfo()">确认信息无误</button>
         <button class="btn btn-primary w-100" onclick="contactSheng()">联系盛子航</button>
         <button class="btn btn-danger mt-4 w-100" onclick="logout()">退出登录</button>
     </div>
@@ -47,11 +61,10 @@
         <button class="btn btn-secondary mt-2 w-100" onclick="backToWelcome()">返回</button>
     </div>
 
-    <!-- 盛子航管理页面（上传 + 完整核对表） -->
+    <!-- 盛子航管理页面 -->
     <div id="page-admin" class="card d-none">
         <h4 class="mb-3">盛子航管理中心</h4>
         
-        <!-- 上传区域 -->
         <div class="mb-4">
             <h5>上传教练结算总表</h5>
             <input type="file" id="excelFile" accept=".xlsx,.xls" class="form-control mb-2">
@@ -60,7 +73,6 @@
         </div>
 
         <hr>
-        <!-- 完整核对表格：姓名 + 课时 + 金额 + 状态 -->
         <h5 class="mt-3">教练结算核对表</h5>
         <div id="check-table" class="mt-3"></div>
 
@@ -82,28 +94,59 @@
     function showCoachLogin() { hideAll(); document.getElementById('page-coach-login').classList.remove('d-none'); }
     function showAdminLogin() { hideAll(); document.getElementById('page-admin-login').classList.remove('d-none'); }
 
+    // ================= 自动登录 =================
+    window.onload = function(){
+        const saved = localStorage.getItem("lastLoginCoach");
+        if(saved) {
+            currentCoach = saved;
+            hideAll();
+            document.getElementById('page-coach-main').classList.remove('d-none');
+            loadCoachPage();
+        }
+    };
+
     // ================= 教练功能 =================
     function coachLogin() {
         const name = document.getElementById('coach-name').value.trim();
         const pwd = document.getElementById('coach-pwd').value.trim();
         const accounts = JSON.parse(localStorage.getItem('coachAccounts') || '{}');
-        
         if (accounts[name] === pwd) {
             currentCoach = name;
+            localStorage.setItem("lastLoginCoach", name);
             hideAll();
             document.getElementById('page-coach-main').classList.remove('d-none');
-            loadMyInfo();
-        } else {
-            alert('账号或密码错误');
-        }
+            loadCoachPage();
+        } else alert('账号或密码错误');
     }
 
-    function loadMyInfo() {
+    function loadCoachPage() {
         const list = JSON.parse(localStorage.getItem('coachData') || '[]');
+        const finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
+        const confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
         const me = list.find(i => i['教练姓名'] === currentCoach);
-        if (me) {
-            document.getElementById('my-info').innerText = 
-                `${currentCoach} 老师\n课时：${me['上课课时']} | 结算金额：${me['结算金额']}`;
+        if(!me) return;
+
+        const isFinal = finalData[currentCoach];
+        const isConfirmed = confirmList[currentCoach];
+
+        document.getElementById('coach-title').innerText = `${currentCoach} 老师`;
+        document.getElementById('c-name').innerText = currentCoach;
+
+        if(isFinal) {
+            document.getElementById('c-lesson').innerText = isFinal.lesson;
+            document.getElementById('c-money').innerText = isFinal.money;
+            document.getElementById('c-status').innerHTML = '<span class="text-success fw-bold">已线下确认</span>';
+            document.getElementById('btn-confirm').classList.add('d-none');
+        } else {
+            document.getElementById('c-lesson').innerText = me['上课课时'];
+            document.getElementById('c-money').innerText = me['结算金额'];
+            if(isConfirmed) {
+                document.getElementById('c-status').innerHTML = '<span class="text-success fw-bold">已线上确认</span>';
+                document.getElementById('btn-confirm').classList.add('d-none');
+            } else {
+                document.getElementById('c-status').innerHTML = '<span class="text-danger fw-bold">未确认</span>';
+                document.getElementById('btn-confirm').classList.remove('d-none');
+            }
         }
     }
 
@@ -112,6 +155,7 @@
         confirmList[currentCoach] = true;
         localStorage.setItem('confirmList', JSON.stringify(confirmList));
         alert('确认成功！');
+        location.reload();
     }
 
     function contactSheng() {
@@ -130,57 +174,77 @@
     function uploadExcel() {
         const file = document.getElementById('excelFile').files[0];
         if (!file) return alert('请选择文件');
-        
         const reader = new FileReader();
         reader.onload = e => {
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            
             if (!data[0]?.['教练姓名'] || !data[0]?.['上课课时'] || !data[0]?.['结算金额']) {
-                return alert('表头必须是：教练姓名、上课课时、结算金额');
+                return alert('表头错误');
             }
-
             localStorage.setItem('coachData', JSON.stringify(data));
             const accounts = {};
             data.forEach(i => accounts[i['教练姓名']] = COACH_DEFAULT_PWD);
             localStorage.setItem('coachAccounts', JSON.stringify(accounts));
-            
-            document.getElementById('upload-result').innerHTML = 
-                `<div class="alert alert-success">上传成功！共 ${data.length} 名教练</div>`;
+            document.getElementById('upload-result').innerHTML = `<div class="alert alert-success">上传成功！</div>`;
             renderCheckTable();
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // ================= 盛子航核对表（完整显示：课时+金额+状态） =================
+    // 线下确认（弹窗填写最终课时、金额）
+    function offlineConfirm(name) {
+        const lesson = prompt(`【${name}】请输入最终确认课时：`);
+        if(!lesson) return;
+        const money = prompt(`【${name}】请输入最终确认结算金额：`);
+        if(!money) return;
+
+        let finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
+        finalData[name] = { lesson, money };
+        localStorage.setItem('finalConfirm', JSON.stringify(finalData));
+        renderCheckTable();
+        alert('已完成线下确认！');
+    }
+
+    // 渲染盛子航表格
     function renderCheckTable() {
         const coachData = JSON.parse(localStorage.getItem('coachData') || '[]');
         const confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
-        
+        const finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
+
         let html = `<table class="table table-bordered text-center">
             <tr class="bg-light">
-                <th>教练姓名</th>
-                <th>上课课时</th>
-                <th>结算金额</th>
-                <th>确认状态</th>
-            </tr>`;
+                <th>教练姓名</th><th>原始课时</th><th>原始金额</th><th>确认状态</th><th>最终课时</th><th>最终金额</th><th>操作</th></tr>`;
         
         coachData.forEach(item => {
             const name = item['教练姓名'];
-            const lesson = item['上课课时'];
-            const money = item['结算金额'];
-            const status = confirmList[name] 
-                ? '<span class="text-success fw-bold">已确认</span>' 
-                : '<span class="text-danger fw-bold">未确认</span>';
-            
+            const isFinal = finalData[name];
+            let status = '';
+            let btn = '';
+            let fLesson = '-';
+            let fMoney = '-';
+
+            if(isFinal) {
+                status = '<span class="text-success fw-bold">已线下确认</span>';
+                fLesson = isFinal.lesson;
+                fMoney = isFinal.money;
+            } else if(confirmList[name]) {
+                status = '<span class="text-primary">已线上确认</span>';
+                btn = `<button class="btn btn-sm btn-warning" onclick="offlineConfirm('${name}')">线下已确认</button>`;
+            } else {
+                status = '<span class="text-danger">未确认</span>';
+                btn = `<button class="btn btn-sm btn-warning" onclick="offlineConfirm('${name}')">线下已确认</button>`;
+            }
+
             html += `<tr>
                 <td>${name}</td>
-                <td>${lesson}</td>
-                <td>${money}</td>
+                <td>${item['上课课时']}</td>
+                <td>${item['结算金额']}</td>
                 <td>${status}</td>
+                <td>${fLesson}</td>
+                <td>${fMoney}</td>
+                <td>${btn}</td>
             </tr>`;
         });
-        
         html += `</table>`;
         document.getElementById('check-table').innerHTML = html;
     }
@@ -188,6 +252,7 @@
     // ================= 退出 =================
     function logout() {
         currentCoach = "";
+        localStorage.removeItem("lastLoginCoach");
         backToWelcome();
     }
 </script>
