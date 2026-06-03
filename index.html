@@ -35,7 +35,6 @@
     <div id="page-coach-main" class="card d-none text-center">
         <h4 id="coach-title" class="mb-3"></h4>
         
-        <!-- 已确认表格 -->
         <div id="final-table" class="mb-4">
             <table class="table table-bordered text-center">
                 <tr><th>教练姓名</th><th>上课课时</th><th>结算金额</th><th>确认状态</th></tr>
@@ -65,6 +64,14 @@
     <div id="page-admin" class="card d-none">
         <h4 class="mb-3">盛子航管理中心</h4>
         
+        <!-- 修改密码 -->
+        <div class="card p-3 mb-3 bg-light">
+            <h5>修改管理密码</h5>
+            <input class="form-control mt-2" id="old-pwd" placeholder="输入旧密码">
+            <input class="form-control mt-2" id="new-pwd" placeholder="输入新密码">
+            <button class="btn btn-warning mt-2" onclick="changeAdminPwd()">修改密码</button>
+        </div>
+
         <div class="mb-4">
             <h5>上传教练结算总表</h5>
             <input type="file" id="excelFile" accept=".xlsx,.xls" class="form-control mb-2">
@@ -82,9 +89,14 @@
 
 <script>
     // ================= 配置 =================
-    const ADMIN_PASSWORD = "123456";
+    const DEFAULT_ADMIN_PWD = "123456";
     const COACH_DEFAULT_PWD = "123456";
     let currentCoach = "";
+
+    // 获取盛子航当前密码
+    function getAdminPwd(){
+        return localStorage.getItem("adminPassword") || DEFAULT_ADMIN_PWD;
+    }
 
     // ================= 页面切换 =================
     function hideAll() {
@@ -164,11 +176,32 @@
 
     // ================= 盛子航功能 =================
     function adminLogin() {
-        if (document.getElementById('admin-pwd').value === ADMIN_PASSWORD) {
+        if (document.getElementById('admin-pwd').value === getAdminPwd()) {
             hideAll();
             document.getElementById('page-admin').classList.remove('d-none');
             renderCheckTable();
         } else alert('密码错误');
+    }
+
+    // 修改盛子航密码
+    function changeAdminPwd(){
+        const oldPwd = document.getElementById('old-pwd').value;
+        const newPwd = document.getElementById('new-pwd').value;
+
+        if(!oldPwd || !newPwd){
+            alert('请输入完整密码');
+            return;
+        }
+
+        if(oldPwd !== getAdminPwd()){
+            alert('旧密码错误');
+            return;
+        }
+
+        localStorage.setItem('adminPassword', newPwd);
+        alert('密码修改成功！下次登录生效');
+        document.getElementById('old-pwd').value = '';
+        document.getElementById('new-pwd').value = '';
     }
 
     function uploadExcel() {
@@ -191,7 +224,7 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // 线下确认（弹窗填写最终课时、金额）
+    // 线下确认
     function offlineConfirm(name) {
         const lesson = prompt(`【${name}】请输入最终确认课时：`);
         if(!lesson) return;
@@ -205,7 +238,7 @@
         alert('已完成线下确认！');
     }
 
-    // 渲染盛子航表格
+    // 渲染表格
     function renderCheckTable() {
         const coachData = JSON.parse(localStorage.getItem('coachData') || '[]');
         const confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
