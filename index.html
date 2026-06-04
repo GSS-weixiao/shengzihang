@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        .container { max-width: 1000px; margin: 40px auto; }
+        .container { max-width: 1300px; margin: 40px auto; }
         .card { padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .btn { padding: 8px 12px; font-size: 14px; }
     </style>
@@ -19,14 +19,14 @@
     <div id="page-welcome" class="card text-center">
         <h2>教练结算确认系统</h2>
         <button class="btn btn-success mt-4 w-100" onclick="showCoachLogin()">教练登录</button>
-        <button class="btn btn-primary mt-3 w-100" onclick="showAdminLogin()">我是盛子航</button>
+        <button class="btn btn-primary mt-3 w-100" onclick="showAdminLogin()">管理员登录</button>
     </div>
 
     <!-- 教练登录 -->
     <div id="page-coach-login" class="card d-none">
         <h4>教练登录</h4>
         <input class="form-control mt-3" id="coach-name" placeholder="教练姓名">
-        <input class="form-control mt-2" id="coach-pwd" type="password" placeholder="密码：123456">
+        <input class="form-control mt-2" id="coach-pwd" type="password" placeholder="密码">
         <button class="btn btn-success mt-3 w-100" onclick="coachLogin()">登录</button>
         <button class="btn btn-secondary mt-2 w-100" onclick="backToWelcome()">返回</button>
     </div>
@@ -47,36 +47,50 @@
             </table>
         </div>
 
+        <!-- 教练修改密码 -->
+        <div class="card p-3 mb-3 bg-light">
+            <h5>修改个人密码</h5>
+            <input class="form-control mt-2" id="coach-old-pwd" placeholder="当前密码">
+            <input class="form-control mt-2" id="coach-new-pwd" placeholder="新密码">
+            <button class="btn btn-warning mt-2" onclick="coachChangePwd()">确认修改密码</button>
+        </div>
+
         <button id="btn-confirm" class="btn btn-success w-100 mb-3" onclick="confirmInfo()">确认信息无误</button>
-        <button class="btn btn-primary w-100" onclick="contactSheng()">联系盛子航</button>
+        <button class="btn btn-primary w-100" onclick="contactSheng()">联系管理员</button>
         <button class="btn btn-danger mt-4 w-100" onclick="logout()">退出登录</button>
     </div>
 
-    <!-- 盛子航登录 -->
+    <!-- 管理员登录 -->
     <div id="page-admin-login" class="card d-none">
-        <h4>盛子航登录</h4>
+        <h4>管理员登录</h4>
         <input class="form-control mt-3" id="admin-pwd" type="password" placeholder="请输入密码">
         <button class="btn btn-primary mt-3 w-100" onclick="adminLogin()">登录</button>
         <button class="btn btn-secondary mt-2 w-100" onclick="backToWelcome()">返回</button>
     </div>
 
-    <!-- 盛子航管理页面 -->
+    <!-- 管理员页面 -->
     <div id="page-admin" class="card d-none">
-        <h4 class="mb-3">盛子航管理中心</h4>
+        <h4 class="mb-3">管理员管理中心</h4>
         
-        <!-- 修改密码 -->
+        <!-- 修改管理员密码 -->
         <div class="card p-3 mb-3 bg-light">
-            <h5>修改管理密码</h5>
-            <input class="form-control mt-2" id="old-pwd" placeholder="输入旧密码">
-            <input class="form-control mt-2" id="new-pwd" placeholder="输入新密码">
+            <h5>修改管理员密码</h5>
+            <input class="form-control mt-2" id="old-pwd" placeholder="旧密码">
+            <input class="form-control mt-2" id="new-pwd" placeholder="新密码">
             <button class="btn btn-warning mt-2" onclick="changeAdminPwd()">修改密码</button>
         </div>
 
         <div class="mb-4">
             <h5>上传教练结算总表</h5>
+            <button class="btn btn-info mb-2" onclick="downloadTemplate()">下载上传模板</button>
             <input type="file" id="excelFile" accept=".xlsx,.xls" class="form-control mb-2">
             <button class="btn btn-primary w-100" onclick="uploadExcel()">上传并生成账号</button>
             <div id="upload-result" class="mt-2"></div>
+        </div>
+
+        <!-- 下载全部数据 -->
+        <div class="mb-4">
+            <button class="btn btn-success w-100" onclick="downloadAllData()">下载全部教练数据表格</button>
         </div>
 
         <hr>
@@ -90,13 +104,13 @@
 <script>
     // ================= 配置 =================
     const DEFAULT_ADMIN_PWD = "123456";
-    const COACH_DEFAULT_PWD = "123456";
+    const DEFAULT_COACH_PWD = "123456";
     let currentCoach = "";
 
-    // 获取盛子航当前密码
-    function getAdminPwd(){
-        return localStorage.getItem("adminPassword") || DEFAULT_ADMIN_PWD;
-    }
+    // 获取/设置密码
+    function getAdminPwd(){ return localStorage.getItem("adminPassword") || DEFAULT_ADMIN_PWD; }
+    function getCoachAccounts(){ return JSON.parse(localStorage.getItem("coachAccounts") || "{}"); }
+    function setCoachAccounts(acc){ localStorage.setItem("coachAccounts", JSON.stringify(acc)); }
 
     // ================= 页面切换 =================
     function hideAll() {
@@ -121,7 +135,7 @@
     function coachLogin() {
         const name = document.getElementById('coach-name').value.trim();
         const pwd = document.getElementById('coach-pwd').value.trim();
-        const accounts = JSON.parse(localStorage.getItem('coachAccounts') || '{}');
+        const accounts = getCoachAccounts();
         if (accounts[name] === pwd) {
             currentCoach = name;
             localStorage.setItem("lastLoginCoach", name);
@@ -140,7 +154,6 @@
 
         const isFinal = finalData[currentCoach];
         const isConfirmed = confirmList[currentCoach];
-
         document.getElementById('coach-title').innerText = `${currentCoach} 老师`;
         document.getElementById('c-name').innerText = currentCoach;
 
@@ -162,6 +175,20 @@
         }
     }
 
+    // 教练修改密码
+    function coachChangePwd(){
+        const old = document.getElementById('coach-old-pwd').value;
+        const now = document.getElementById('coach-new-pwd').value;
+        const accounts = getCoachAccounts();
+        if(!old || !now) return alert('请填写完整');
+        if(accounts[currentCoach] !== old) return alert('当前密码错误');
+        accounts[currentCoach] = now;
+        setCoachAccounts(accounts);
+        alert('密码修改成功！');
+        document.getElementById('coach-old-pwd').value='';
+        document.getElementById('coach-new-pwd').value='';
+    }
+
     function confirmInfo() {
         let confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
         confirmList[currentCoach] = true;
@@ -171,10 +198,10 @@
     }
 
     function contactSheng() {
-        alert('请联系盛子航');
+        alert('请联系管理员');
     }
 
-    // ================= 盛子航功能 =================
+    // ================= 管理员功能 =================
     function adminLogin() {
         if (document.getElementById('admin-pwd').value === getAdminPwd()) {
             hideAll();
@@ -183,27 +210,60 @@
         } else alert('密码错误');
     }
 
-    // 修改盛子航密码
+    // 修改管理员密码
     function changeAdminPwd(){
         const oldPwd = document.getElementById('old-pwd').value;
         const newPwd = document.getElementById('new-pwd').value;
-
-        if(!oldPwd || !newPwd){
-            alert('请输入完整密码');
-            return;
-        }
-
-        if(oldPwd !== getAdminPwd()){
-            alert('旧密码错误');
-            return;
-        }
-
+        if(!oldPwd || !newPwd) return alert('请输入完整密码');
+        if(oldPwd !== getAdminPwd()) return alert('旧密码错误');
         localStorage.setItem('adminPassword', newPwd);
         alert('密码修改成功！下次登录生效');
-        document.getElementById('old-pwd').value = '';
-        document.getElementById('new-pwd').value = '';
+        document.getElementById('old-pwd').value='';
+        document.getElementById('new-pwd').value='';
     }
 
+    // 下载上传模板
+    function downloadTemplate() {
+        const template = [
+            { "教练姓名": "", "上课课时": "", "结算金额": "", "登录密码": "" }
+        ];
+        const ws = XLSX.utils.json_to_sheet(template);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "模板");
+        XLSX.writeFile(wb, "教练信息上传模板.xlsx");
+    }
+
+    // 下载全部数据
+    function downloadAllData() {
+        const coachData = JSON.parse(localStorage.getItem('coachData') || '[]');
+        const confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
+        const finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
+        const accounts = getCoachAccounts();
+
+        const exportData = coachData.map(item => {
+            const name = item['教练姓名'];
+            let status = "未确认";
+            if(finalData[name]) status = "已线下确认";
+            else if(confirmList[name]) status = "已线上确认";
+
+            return {
+                "教练姓名": name,
+                "原始课时": item['上课课时'],
+                "原始金额": item['结算金额'],
+                "登录密码": accounts[name] || "",
+                "确认状态": status,
+                "最终课时": finalData[name]?.lesson || "",
+                "最终金额": finalData[name]?.money || ""
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "全部教练数据");
+        XLSX.writeFile(wb, "教练结算全部数据.xlsx");
+    }
+
+    // 上传Excel（支持密码列）
     function uploadExcel() {
         const file = document.getElementById('excelFile').files[0];
         if (!file) return alert('请选择文件');
@@ -212,70 +272,85 @@
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             if (!data[0]?.['教练姓名'] || !data[0]?.['上课课时'] || !data[0]?.['结算金额']) {
-                return alert('表头错误');
+                return alert('必须包含：教练姓名、上课课时、结算金额');
             }
+
             localStorage.setItem('coachData', JSON.stringify(data));
             const accounts = {};
-            data.forEach(i => accounts[i['教练姓名']] = COACH_DEFAULT_PWD);
-            localStorage.setItem('coachAccounts', JSON.stringify(accounts));
-            document.getElementById('upload-result').innerHTML = `<div class="alert alert-success">上传成功！</div>`;
+            data.forEach(i => {
+                const name = i['教练姓名'];
+                const pwd = i['登录密码'] || DEFAULT_COACH_PWD;
+                accounts[name] = pwd;
+            });
+            setCoachAccounts(accounts);
+            document.getElementById('upload-result').innerHTML = `<div class="alert alert-success">上传成功！已生成账号密码</div>`;
             renderCheckTable();
         };
         reader.readAsArrayBuffer(file);
     }
 
+    // 管理员修改教练密码
+    function adminEditPwd(name){
+        const newPwd = prompt(`请设置【${name}】的新密码：`);
+        if(!newPwd) return;
+        const accounts = getCoachAccounts();
+        accounts[name] = newPwd;
+        setCoachAccounts(accounts);
+        renderCheckTable();
+        alert('密码已修改');
+    }
+
     // 线下确认
     function offlineConfirm(name) {
-        const lesson = prompt(`【${name}】请输入最终确认课时：`);
+        const lesson = prompt(`【${name}】最终课时：`);
         if(!lesson) return;
-        const money = prompt(`【${name}】请输入最终确认结算金额：`);
+        const money = prompt(`【${name}】最终金额：`);
         if(!money) return;
-
         let finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
         finalData[name] = { lesson, money };
         localStorage.setItem('finalConfirm', JSON.stringify(finalData));
         renderCheckTable();
-        alert('已完成线下确认！');
+        alert('已线下确认');
     }
 
-    // 渲染表格
+    // 渲染管理员表格
     function renderCheckTable() {
         const coachData = JSON.parse(localStorage.getItem('coachData') || '[]');
         const confirmList = JSON.parse(localStorage.getItem('confirmList') || '{}');
         const finalData = JSON.parse(localStorage.getItem('finalConfirm') || '{}');
+        const accounts = getCoachAccounts();
 
         let html = `<table class="table table-bordered text-center">
             <tr class="bg-light">
-                <th>教练姓名</th><th>原始课时</th><th>原始金额</th><th>确认状态</th><th>最终课时</th><th>最终金额</th><th>操作</th></tr>`;
+                <th>教练姓名</th><th>原始课时</th><th>原始金额</th><th>登录密码</th><th>密码操作</th><th>确认状态</th><th>最终课时</th><th>最终金额</th><th>线下确认</th></tr>`;
         
         coachData.forEach(item => {
             const name = item['教练姓名'];
+            const pwd = accounts[name] || '-';
             const isFinal = finalData[name];
             let status = '';
-            let btn = '';
-            let fLesson = '-';
-            let fMoney = '-';
+            let fLesson = '-', fMoney = '-';
 
             if(isFinal) {
-                status = '<span class="text-success fw-bold">已线下确认</span>';
+                status = '<span class="text-success">已线下确认</span>';
                 fLesson = isFinal.lesson;
                 fMoney = isFinal.money;
             } else if(confirmList[name]) {
                 status = '<span class="text-primary">已线上确认</span>';
-                btn = `<button class="btn btn-sm btn-warning" onclick="offlineConfirm('${name}')">线下已确认</button>`;
             } else {
                 status = '<span class="text-danger">未确认</span>';
-                btn = `<button class="btn btn-sm btn-warning" onclick="offlineConfirm('${name}')">线下已确认</button>`;
             }
 
             html += `<tr>
                 <td>${name}</td>
                 <td>${item['上课课时']}</td>
                 <td>${item['结算金额']}</td>
+                <td>${pwd}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="adminEditPwd('${name}')">修改密码</button></td>
                 <td>${status}</td>
                 <td>${fLesson}</td>
                 <td>${fMoney}</td>
-                <td>${btn}</td>
+                <td><button class="btn btn-sm btn-warning" onclick="offlineConfirm('${name}')">线下已确认</button></td>
             </tr>`;
         });
         html += `</table>`;
